@@ -1,0 +1,4 @@
+.bundle
+.rspec_status
+vendor
+Gemfile.lock

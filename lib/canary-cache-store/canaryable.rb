@@ -8,7 +8,7 @@ module CanaryCacheStore
     included do
       extend ClassMethods
 
-      attr_reader :stores, :default_store, :canary_store, :rollout_percentage
+      attr_reader :stores, :default_store, :canary_store, :write_store, :rollout_percentage
 
       def initialize(options = nil)
         options ||= {}
@@ -19,7 +19,7 @@ module CanaryCacheStore
 
         @rollout_percentage = options[:rollout_percentage] || 0
 
-        @stores = %i[canary default].map do |key|
+        @stores = %i[canary default write].map do |key|
           config = options[key.to_sym] || {}
           next if config.blank?
 
@@ -70,7 +70,7 @@ module CanaryCacheStore
       end
 
       def read_canary?
-        rand(100) < rollout_percentage
+        @canary_store.present? && rand(100) < rollout_percentage
       end
 
       def synchronize(&block)
@@ -78,8 +78,9 @@ module CanaryCacheStore
       end
 
       def perform_write(action, *args)
+        writable_stores = @write_store.present? ? [@write_store] : stores
         synchronize do
-          stores.map do |store|
+          writable_stores.map do |store|
             begin
               store.send(action, *args)
             rescue StandardError => ex

@@ -104,6 +104,42 @@ RSpec.describe CanaryCacheStore::Canaryable do
     end
   end
 
+  context 'when write store is specified' do
+    let(:write_store) { CanaryCacheStore.klass.new(size: 64.megabytes) }
+    let(:default_store) { CanaryCacheStore.klass.new(size: 32.megabytes) }
+    let(:options) do
+      {
+        write: write_store,
+        default: default_store
+      }
+    end
+    let(:store) do
+      CanaryCacheStore.configure do |config|
+        config.base_class = ActiveSupport::Cache::MemoryStore
+      end
+      ::Dummy::MemoryCacheStore.new(options)
+    end
+
+    # Test table for write-operation tests
+    {
+      increment: [:key, 1, {}],
+      decrement: [:key, 1, {}],
+      cleanup: [{}],
+      clear: [{}],
+      delete_matched: [nil, {}],
+      write_entry: [:key, :value, {}],
+      delete_entry: [:key, {}]
+    }.each do |method_name, args|
+      describe "##{method_name}" do
+        it 'performs in write store but not default cache store' do
+          expect(write_store).to receive(method_name).with(*args)
+          expect(default_store).not_to receive(method_name).with(*args)
+          store.send(method_name, *args)
+        end
+      end
+    end
+  end
+
   context 'when connecting with redis' do
     module Dummy
       class RedisCacheStore < ::ActiveSupport::Cache::RedisStore
